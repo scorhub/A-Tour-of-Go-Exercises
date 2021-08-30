@@ -5,7 +5,7 @@ import (
 )
 
 // A Tour of Go
-// Exercise: Loops and Functions
+// Exercise: Slices
 // https://tour.golang.org/moretypes/18
 
 func Pic(dx, dy int) [][]uint8 {
