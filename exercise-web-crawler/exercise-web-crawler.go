@@ -1,38 +1,73 @@
-package main
+package 
+
+// A Tour of Go
+// Exercise: Web Crawler
+// https://tour.golang.org/concurrency/10
 
 import (
 	"fmt"
+	"sync"
 )
+
+type SafeCounter struct {
+	mu sync.Mutex
+	v  map[string]bool
+}
+
+func (c SafeCounter) checkUrl(url string) bool {
+	defer c.mu.Unlock()
+	c.mu.Lock()
+	_, ok := c.v[url]
+	if ok == false {
+		c.v[url] = true
+		return false
+	}
+	return true
+}
 
 type Fetcher interface {
 	// Fetch returns the body of URL and
 	// a slice of URLs found on that page.
+
 	Fetch(url string) (body string, urls []string, err error)
 }
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher) {
+
+func Crawl(url string, depth int, fetcher Fetcher, sc SafeCounter, wg *sync.WaitGroup) {
+
 	// TODO: Fetch URLs in parallel.
 	// TODO: Don't fetch the same URL twice.
 	// This implementation doesn't do either:
-	if depth <= 0 {
+
+	defer wg.Done()
+
+	if depth <= 0 || sc.checkUrl(url) {
 		return
 	}
+
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	fmt.Printf("found: %s %q\n", url, body)
 	for _, u := range urls {
-		Crawl(u, depth-1, fetcher)
+		wg.Add(1)
+		go Crawl(u, depth-1, fetcher, sc, wg)
 	}
+
 	return
 }
 
 func main() {
-	Crawl("https://golang.org/", 4, fetcher)
+	wg := &sync.WaitGroup{}
+	sc := SafeCounter{v: make(map[string]bool)}
+	wg.Add(1)
+	go Crawl("https://golang.org/", 4, fetcher, sc, wg)
+	wg.Wait()
 }
 
 // fakeFetcher is Fetcher that returns canned results.
